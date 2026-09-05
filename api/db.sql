@@ -30,6 +30,7 @@ CREATE TABLE messages (
     from_user TEXT REFERENCES users.username NOT NULL,
     msg TEXT NOT NULL,
     is_join BOOLEAN DEFAULT false,
+    is_leave BOOLEAN DEFAULT false,
     channel TEXT REFERENCES channels.channel
     to_user TEXT REFERENCES users.username
 );

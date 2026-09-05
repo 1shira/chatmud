@@ -34,7 +34,7 @@ CREATE TABLE messages (
     channel TEXT REFERENCES channels.channel,
     to_user TEXT REFERENCES users.username
     CONSTRAINT has_dest CHECK (
-        (channel IS NOT NULL AND to_user I  NULL) OR
+        (channel IS NOT NULL AND to_user IS NULL) OR
         (channel IS NULL AND to_user IS NOT NULL)
     )
 );  

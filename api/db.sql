@@ -31,6 +31,10 @@ CREATE TABLE messages (
     msg TEXT NOT NULL,
     is_join BOOLEAN DEFAULT false,
     is_leave BOOLEAN DEFAULT false,
-    channel TEXT REFERENCES channels.channel
+    channel TEXT REFERENCES channels.channel,
     to_user TEXT REFERENCES users.username
-);
+    CONSTRAINT has_dest CHECK (
+        (channel IS NOT NULL AND to_user I  NULL) OR
+        (channel IS NULL AND to_user IS NOT NULL)
+    )
+);  

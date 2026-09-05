@@ -12,8 +12,14 @@ interface Message {
     "msg": string
     "is_join"?: true,
     "is_leave"?: true,
-    "channel"?: "0000"
+    "channel"?: "0000",
+    "recieved_by"?: string,
 }
+
+type chatAPIReturn = {
+    ok: true,
+    chats: { [K in string]: Message[] }
+} | { ok: false }
 
 const getChatToken = async (chat_pass: chatPass): Promise<{ ok: false, msg: string } | { ok: true, chat_token: string }> => {
 
@@ -95,25 +101,29 @@ const getChats = async (token: string, since: Date, users: string[]): Promise<
             return { ok: false, msg: "Unexpected status code return" }
         }
 
-        if (res.data.ok === true) {
-            let u = Object.keys(res.data.users);
-            if(u.some((el) => !users.includes(el))){
+        const ret = res.data as chatAPIReturn
+
+        if (ret.ok === true) {
+            let u = Object.keys(ret.chats);
+            if (u.some((el) => !users.includes(el))) {
                 console.log("wtf happened? - recieved messages we did not request")
             }
-            if(users.some((el) => !u.includes(el))){
+            if (users.some((el) => !u.includes(el))) {
                 console.log("did not get messages for all requested users")
                 // don't know if this happens when a user has no msgs to read
                 // or if we don't have access to that users (or if that returns non-200)
             }
 
             let messages = [];
-            for(let usr of u) {
-                messages.push(...res.data.users[usr]);
+            for (let usr of u) {
+                if (ret.chats[usr].length === 0) continue;
+                ret.chats[usr].forEach(el => el.recieved_by = usr)
+                messages.push(...res.data.chats[usr]);
             }
 
-            return {ok:true, messages}
+            return { ok: true, messages }
 
-        }else if (res.data.ok === false) {
+        } else if (ret.ok === false) {
             return { ok: false, msg: res.data.toJSON() }
         };
 

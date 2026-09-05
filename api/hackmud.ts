@@ -25,6 +25,7 @@ const getChatToken = async (chat_pass: chatPass): Promise<{ ok: false, msg: stri
 
     try {
         const res = await axios.post('htpps://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
+        if(res.status === 403) return {ok:false, msg:"chat_pass invalid"}
         if (res.status !== 200) {
             return { ok: false, msg: "Unexpected status code return" }
         }
@@ -48,6 +49,7 @@ const getChatToken = async (chat_pass: chatPass): Promise<{ ok: false, msg: stri
 const getAccountDetails = async (token: string): Promise<{ ok: false, msg: string } | { ok: true, users: string[], channels: string[] }> => {
     try {
         const res = await axios.post('htpps://hackmud.com/mobile/account_data.json', { chat_token: token }) // ratelimit?
+        if(res.status === 401) return {ok:false,msg:"chat_token expired or invalid"}
         if (res.status !== 200) {
             return { ok: false, msg: "Unexpected status code return" }
         }
@@ -97,6 +99,7 @@ const getChats = async (token: string, since: Date, users: string[]): Promise<
                 usernames: users,
                 after: Math.floor(since.valueOf() / 1000)
             })
+        if(res.status === 401) return {ok:false,msg:"chat_token expired or invalid"}
         if (res.status !== 200) {
             return { ok: false, msg: "Unexpected status code return" }
         }

@@ -5,6 +5,7 @@ import NodeCache from "node-cache";
 const cache = new NodeCache({ stdTTL: 86400 })
 
 type chatPass = string & { length: 5 }
+
 interface Message {
     id: string;
     "t": number,
@@ -17,15 +18,14 @@ interface Message {
 }
 
 type ErrorResponses =
-    { code: "E_INV_PASS" }
+    { code: "E_RATELIMIT"}
+    | { code: "E_INV_PASS" }
     | { code: "E_INV_TOKEN" }
     | { code: "E_CONN_TO" }
     | { code: "E_UNH_RESCODE", info: { rescode: number, resdata: object } }
     | { code: "E_UNH_RES", info: object }
     | { code: "E_UNX_RES", info: object }
     | { code: "E_THROWABLE", info: object }
-
-
 
 type chatAPIReturn = {
     ok: true,
@@ -57,6 +57,7 @@ const getChatToken = async (chat_pass: chatPass):
     const _res = await sendPostRequest('https://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
     if (_res.ok !== true) return _res;
     const res = _res.res
+
     if (res.status === 403) return { ok: false, code: "E_INV_PASS" }
     if (res.status !== 200) {
         return { ok: false, code: "E_UNH_RESCODE", info: { rescode: res.status, resdata: res.data } }
@@ -76,6 +77,7 @@ const getAccountDetails = async (token: string):
     const _res = await sendPostRequest('https://hackmud.com/mobile/account_data.json', { chat_token: token }) // ratelimit?
     if (_res.ok !== true) return _res;
     const res = _res.res
+
     if (res.status === 401) return { ok: false, code: "E_INV_TOKEN" }
     if (res.status !== 200) {
         return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
@@ -104,7 +106,6 @@ const getAccountDetails = async (token: string):
     return { ok: false, code: "E_UNX_RES", info: res.data }
 }
 
-
 const getChats = async (token: string, since: Date, users: string[]):
     Promise<
         { ok: true, messages: Message[] }
@@ -121,6 +122,7 @@ const getChats = async (token: string, since: Date, users: string[]):
         })
     if (_res.ok !== true) return _res;
     const res = _res.res
+
     if (res.status === 401) return { ok: false, code: "E_INV_TOKEN" }
     if (res.status !== 200) {
         return { ok: false, code: "E_UNH_RESCODE", info: { rescode: res.status, resdata: res.data } }

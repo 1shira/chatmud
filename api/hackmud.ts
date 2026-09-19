@@ -2,7 +2,6 @@ import axios from 'axios';
 import type { AxiosResponse } from 'axios';
 import NodeCache from "node-cache";
 
-
 const cache = new NodeCache({ stdTTL: 86400 })
 
 type chatPass = string & { length: 5 }
@@ -17,15 +16,28 @@ interface Message {
     "recieved_by"?: string,
 }
 
+type ErrorResponses =
+    { code: "E_INV_PASS" }
+    | { code: "E_INV_TOKEN" }
+    | { code: "E_CONN_TO" }
+    | { code: "E_UNH_RESCODE", info: { rescode: number, resdata: object } }
+    | { code: "E_UNH_RES", info: object }
+    | { code: "E_UNX_RES", info: object }
+    | { code: "E_THROWABLE", info: object }
+
+
+
 type chatAPIReturn = {
     ok: true,
     chats: { [K in string]: Message[] }
 } | { ok: false }
 
+type FailureResponse = { ok: false } & ErrorResponses
+
 async function sendPostRequest<T>(url: string, body: T):
     Promise<
         { ok: true, res: AxiosResponse<any, T, {}, any> } |
-        { ok: false, code: string, info?: object }> {
+        FailureResponse> {
     try {
         const res = await axios.post(url, body);
         return { ok: true, res };
@@ -39,15 +51,15 @@ async function sendPostRequest<T>(url: string, body: T):
 
 const getChatToken = async (chat_pass: chatPass):
     Promise<
-        { ok: false, code: string, info?: object }
-        | { ok: true, chat_token: string }
+         { ok: true, chat_token: string }
+         | FailureResponse
     > => {
-    const _res = await sendPostRequest('htpps://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
+    const _res = await sendPostRequest('https://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
     if (_res.ok !== true) return _res;
     const res = _res.res
-    if (res.status === 403) return { ok: false, code: "E_PASS_INVALID" }
+    if (res.status === 403) return { ok: false, code: "E_INV_PASS" }
     if (res.status !== 200) {
-        return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
+        return { ok: false, code: "E_UNH_RESCODE", info: { rescode: res.status, resdata: res.data } }
     }
 
     if ("ok" in res.data) return res.data;
@@ -61,7 +73,7 @@ const getAccountDetails = async (token: string):
         { ok: false, code: string, info?: object } |
         { ok: true, users: string[], channels: string[] }
     > => {
-    const _res = await sendPostRequest('htpps://hackmud.com/mobile/account_data.json', { chat_token: token }) // ratelimit?
+    const _res = await sendPostRequest('https://hackmud.com/mobile/account_data.json', { chat_token: token }) // ratelimit?
     if (_res.ok !== true) return _res;
     const res = _res.res
     if (res.status === 401) return { ok: false, code: "E_INV_TOKEN" }
@@ -95,13 +107,13 @@ const getAccountDetails = async (token: string):
 
 const getChats = async (token: string, since: Date, users: string[]):
     Promise<
-        { ok: false, code: string, info?: object } |
         { ok: true, messages: Message[] }
+        | FailureResponse
     > => {
     if ((cache.get("ratelimit_chats") as number || 0) > Date.now() - 2500) return { ok: false, code: "E_RATELIMIT" }
 
     cache.set("ratelimit_chats", Date.now())
-    const _res = await sendPostRequest('htpps://hackmud.com/mobile/chats.json',
+    const _res = await sendPostRequest('https://hackmud.com/mobile/chats.json',
         {
             chat_token: token,
             usernames: users,
@@ -109,9 +121,9 @@ const getChats = async (token: string, since: Date, users: string[]):
         })
     if (_res.ok !== true) return _res;
     const res = _res.res
-    if (res.status === 401) return { ok: false, code: "E_INV_TOKENs" }
+    if (res.status === 401) return { ok: false, code: "E_INV_TOKEN" }
     if (res.status !== 200) {
-        return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
+        return { ok: false, code: "E_UNH_RESCODE", info: { rescode: res.status, resdata: res.data } }
     }
 
     const ret = res.data as chatAPIReturn
@@ -142,4 +154,10 @@ const getChats = async (token: string, since: Date, users: string[]):
 
     console.log(JSON.stringify(res.data));
     return { ok: false, code: "E_UNX_RES", info: res.data }
+}
+
+export {
+    getChatToken,
+    getAccountDetails,
+    getChats,
 }

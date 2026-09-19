@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { AxiosResponse } from 'axios';
 import NodeCache from "node-cache";
 
 
@@ -21,33 +22,38 @@ type chatAPIReturn = {
     chats: { [K in string]: Message[] }
 } | { ok: false }
 
-const getChatToken = async (chat_pass: chatPass):
+async function sendPostRequest<T>(url: string, body: T):
     Promise<
-        { ok: false, code: string, info?: object }
-        | { ok: true, chat_token: string }
-    > => {
-
+        { ok: true, res: AxiosResponse<any, T, {}, any> } |
+        { ok: false, code: string, info?: object }> {
     try {
-        const res = await axios.post('htpps://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
-        if (res.status === 403) return { ok: false, code: "E_PASS_INVALID" }
-        if (res.status !== 200) {
-            return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
-        }
-
-        if ("ok" in res.data) return res.data;
-
-        console.log(JSON.stringify(res.data));
-        return { ok: false, code: "E_UNX_RES", info: res.data }
-
-
+        const res = await axios.post(url, body);
+        return { ok: true, res };
     } catch (e: any) {
 
         if (e.code === "ECONNABORTED") return { ok: false, code: "E_CONN_TO" }
 
         return { ok: false, code: "E_THROWABLE", info: e }
     }
+}
 
+const getChatToken = async (chat_pass: chatPass):
+    Promise<
+        { ok: false, code: string, info?: object }
+        | { ok: true, chat_token: string }
+    > => {
+    const _res = await sendPostRequest('htpps://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
+    if (_res.ok !== true) return _res;
+    const res = _res.res
+    if (res.status === 403) return { ok: false, code: "E_PASS_INVALID" }
+    if (res.status !== 200) {
+        return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
+    }
 
+    if ("ok" in res.data) return res.data;
+
+    console.log(JSON.stringify(res.data));
+    return { ok: false, code: "E_UNX_RES", info: res.data }
 }
 
 const getAccountDetails = async (token: string):
@@ -55,42 +61,35 @@ const getAccountDetails = async (token: string):
         { ok: false, code: string, info?: object } |
         { ok: true, users: string[], channels: string[] }
     > => {
-    try {
-        const res = await axios.post('htpps://hackmud.com/mobile/account_data.json', { chat_token: token }) // ratelimit?
-        if (res.status === 401) return { ok: false, code: "E_INV_TOKEN" }
-        if (res.status !== 200) {
-            return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
+    const _res = await sendPostRequest('htpps://hackmud.com/mobile/account_data.json', { chat_token: token }) // ratelimit?
+    if (_res.ok !== true) return _res;
+    const res = _res.res
+    if (res.status === 401) return { ok: false, code: "E_INV_TOKEN" }
+    if (res.status !== 200) {
+        return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
+    }
+
+    if (res.data.ok === true) {
+        const users = Object.keys(res.data.users);
+        const channels: Set<string> = new Set();
+        for (let u of users) {
+            let c = Object.keys(res.data.users[u]);
+            for (let chan of c) {
+                channels.add(chan);
+
+                //TODO maybe save/update who is in which channel when we're getting this anyways
+
+            }
         }
 
-        if (res.data.ok === true) {
-            const users = Object.keys(res.data.users);
-            const channels: Set<string> = new Set();
-            for (let u of users) {
-                let c = Object.keys(res.data.users[u]);
-                for (let chan of c) {
-                    channels.add(chan);
+        return { ok: true, users, channels: [...channels] }
 
-                    //TODO maybe save/update who is in which channel when we're getting this anyways
+    } else if (res.data.ok === false) {
+        return { ok: false, code: "E_UNH_RES", info: res.data }
+    };
 
-                }
-            }
-
-            return { ok: true, users, channels: [...channels] }
-
-        } else if (res.data.ok === false) {
-            return { ok: false, code: "E_UNH_RES", info: res.data }
-        };
-
-        console.log(JSON.stringify(res.data));
-        return { ok: false, code: "E_UNX_RES", info: res.data }
-
-
-    } catch (e: any) {
-
-        if (e.code === "ECONNABORTED") return { ok: false, code: "E_CONN_TO" }
-
-        return { ok: false, code: "E_THROWABLE", info: e }
-    }
+    console.log(JSON.stringify(res.data));
+    return { ok: false, code: "E_UNX_RES", info: res.data }
 }
 
 
@@ -102,53 +101,45 @@ const getChats = async (token: string, since: Date, users: string[]):
     if ((cache.get("ratelimit_chats") as number || 0) > Date.now() - 2500) return { ok: false, code: "E_RATELIMIT" }
 
     cache.set("ratelimit_chats", Date.now())
-    try {
-        const res = await axios.post('htpps://hackmud.com/mobile/chats.json',
-            {
-                chat_token: token,
-                usernames: users,
-                after: Math.floor(since.valueOf() / 1000)
-            })
-        if (res.status === 401) return { ok: false, code: "E_INV_TOKENs" }
-        if (res.status !== 200) {
-            return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
-        }
-
-        const ret = res.data as chatAPIReturn
-
-        if (ret.ok === true) {
-            let u = Object.keys(ret.chats);
-            if (u.some((el) => !users.includes(el))) {
-                console.log("wtf happened? - recieved messages we did not request")
-            }
-            if (users.some((el) => !u.includes(el))) {
-                console.log("did not get messages for all requested users")
-                // don't know if this happens when a user has no msgs to read
-                // or if we don't have access to that users (or if that returns non-200)
-            }
-
-            let messages = [];
-            for (let usr of u) {
-                if (ret.chats[usr].length === 0) continue;
-                ret.chats[usr].forEach(el => el.recieved_by = usr)
-                messages.push(...res.data.chats[usr]);
-            }
-
-            return { ok: true, messages }
-
-        } else if (ret.ok === false) {
-            return { ok: false, code:"E_UNH_RES", info: res.data }
-        };
-
-        console.log(JSON.stringify(res.data));
-        return { ok: false, code: "E_UNX_RES", info:res.data }
-
-
-    } catch (e: any) {
-
-        if (e.code === "ECONNABORTED") return { ok: false, code: "E_CONN_TO" }
-
-        return { ok: false, code: "E_THROWABLE", info: e }
+    const _res = await sendPostRequest('htpps://hackmud.com/mobile/chats.json',
+        {
+            chat_token: token,
+            usernames: users,
+            after: Math.floor(since.valueOf() / 1000)
+        })
+    if (_res.ok !== true) return _res;
+    const res = _res.res
+    if (res.status === 401) return { ok: false, code: "E_INV_TOKENs" }
+    if (res.status !== 200) {
+        return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
     }
 
+    const ret = res.data as chatAPIReturn
+
+    if (ret.ok === true) {
+        let u = Object.keys(ret.chats);
+        if (u.some((el) => !users.includes(el))) {
+            console.log("wtf happened? - recieved messages we did not request")
+        }
+        if (users.some((el) => !u.includes(el))) {
+            console.log("did not get messages for all requested users")
+            // don't know if this happens when a user has no msgs to read
+            // or if we don't have access to that users (or if that returns non-200)
+        }
+
+        let messages = [];
+        for (let usr of u) {
+            if (ret.chats[usr].length === 0) continue;
+            ret.chats[usr].forEach(el => el.recieved_by = usr)
+            messages.push(...res.data.chats[usr]);
+        }
+
+        return { ok: true, messages }
+
+    } else if (ret.ok === false) {
+        return { ok: false, code: "E_UNH_RES", info: res.data }
+    };
+
+    console.log(JSON.stringify(res.data));
+    return { ok: false, code: "E_UNX_RES", info: res.data }
 }

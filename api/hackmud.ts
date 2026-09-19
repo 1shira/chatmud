@@ -6,19 +6,8 @@ const cache = new NodeCache({ stdTTL: 86400 })
 
 type chatPass = string & { length: 5 }
 
-interface Message {
-    id: string;
-    "t": number,
-    "from_user": string,
-    "msg": string
-    "is_join"?: true,
-    "is_leave"?: true,
-    "channel"?: "0000",
-    "recieved_by"?: string,
-}
-
 type ErrorResponses =
-    { code: "E_RATELIMIT"}
+    { code: "E_RATELIMIT" }
     | { code: "E_INV_PASS" }
     | { code: "E_INV_TOKEN" }
     | { code: "E_CONN_TO" }
@@ -51,8 +40,8 @@ async function sendPostRequest<T>(url: string, body: T):
 
 const getChatToken = async (chat_pass: chatPass):
     Promise<
-         { ok: true, chat_token: string }
-         | FailureResponse
+        { ok: true, chat_token: string }
+        | FailureResponse
     > => {
     const _res = await sendPostRequest('https://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
     if (_res.ok !== true) return _res;
@@ -144,7 +133,9 @@ const getChats = async (token: string, since: Date, users: string[]):
         let messages = [];
         for (let usr of u) {
             if (ret.chats[usr].length === 0) continue;
-            ret.chats[usr].forEach(el => el.recieved_by = usr)
+            ret.chats[usr].forEach(el => {
+                if (!el.channel) el.to_user = usr
+            })
             messages.push(...res.data.chats[usr]);
         }
 

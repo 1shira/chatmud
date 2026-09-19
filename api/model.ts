@@ -14,4 +14,36 @@ const pool = new pg.Pool({
 });
 const query = (text: string, params: string[]) => pool.query(text, params);
 
-export {};
+const genPlaceholderString = (param_amount: number, count: number) => {
+  let s = "";
+  for (let i = 0; i < count; i++) {
+    s += "("
+    for (let j = 1; j <= param_amount; j++) {
+      s += `$${i * param_amount + j}`
+      if (j < param_amount) s += ","
+    }
+    s += "),"
+  }
+  return s
+}
+
+const dbInsertMessage = (...messages: Message[]) => query(`
+  INSERT INTO messages
+  (mId, msg, t, from_user, channel, to_user, is_join, is_leave)
+  VALUES 
+  ${genPlaceholderString(7, messages.length)}
+  `,
+  messages.map(el => [
+    el.id,
+    el.msg,
+    new Date(el.t * 1000).toISOString(),
+    el.from_user,
+    el.channel || "NULL",
+    el.to_user || "NULL",
+    el.is_join ? "TRUE" : "DEFAULT",
+    el.is_leave ? "TRUE" : "DEFAULT",
+  ]).flat())
+
+export {
+  dbInsertMessage,
+ };

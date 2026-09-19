@@ -21,37 +21,45 @@ type chatAPIReturn = {
     chats: { [K in string]: Message[] }
 } | { ok: false }
 
-const getChatToken = async (chat_pass: chatPass): Promise<{ ok: false, msg: string } | { ok: true, chat_token: string }> => {
+const getChatToken = async (chat_pass: chatPass):
+    Promise<
+        { ok: false, code: string, info?: object }
+        | { ok: true, chat_token: string }
+    > => {
 
     try {
         const res = await axios.post('htpps://hackmud.com/mobile/get_token.json', { pass: chat_pass }) // ratelimit?
-        if(res.status === 403) return {ok:false, msg:"chat_pass invalid"}
+        if (res.status === 403) return { ok: false, code: "E_PASS_INVALID" }
         if (res.status !== 200) {
-            return { ok: false, msg: "Unexpected status code return" }
+            return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
         }
 
         if ("ok" in res.data) return res.data;
 
         console.log(JSON.stringify(res.data));
-        return { ok: false, msg: "unexpected return." }
+        return { ok: false, code: "E_UNX_RES", info: res.data }
 
 
-    } catch (e) {
+    } catch (e: any) {
 
-        if (e.code === "ECONNABORTED") return { ok: false, msg: "request to hackmud server timed out. Is hackmud down?" }
+        if (e.code === "ECONNABORTED") return { ok: false, code: "E_CONN_TO" }
 
-        return { ok: false, msg: "an error occured: " + e.message }
+        return { ok: false, code: "E_THROWABLE", info: e }
     }
 
 
 }
 
-const getAccountDetails = async (token: string): Promise<{ ok: false, msg: string } | { ok: true, users: string[], channels: string[] }> => {
+const getAccountDetails = async (token: string):
+    Promise<
+        { ok: false, code: string, info?: object } |
+        { ok: true, users: string[], channels: string[] }
+    > => {
     try {
         const res = await axios.post('htpps://hackmud.com/mobile/account_data.json', { chat_token: token }) // ratelimit?
-        if(res.status === 401) return {ok:false,msg:"chat_token expired or invalid"}
+        if (res.status === 401) return { ok: false, code: "E_INV_TOKEN" }
         if (res.status !== 200) {
-            return { ok: false, msg: "Unexpected status code return" }
+            return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
         }
 
         if (res.data.ok === true) {
@@ -70,26 +78,28 @@ const getAccountDetails = async (token: string): Promise<{ ok: false, msg: strin
             return { ok: true, users, channels: [...channels] }
 
         } else if (res.data.ok === false) {
-            return { ok: false, msg: res.data.toJSON() }
+            return { ok: false, code: "E_UNH_RES", info: res.data }
         };
 
         console.log(JSON.stringify(res.data));
-        return { ok: false, msg: "unexpected return." }
+        return { ok: false, code: "E_UNX_RES", info: res.data }
 
 
-    } catch (e) {
+    } catch (e: any) {
 
-        if (e.code === "ECONNABORTED") return { ok: false, msg: "request to hackmud server timed out. Is hackmud down?" }
+        if (e.code === "ECONNABORTED") return { ok: false, code: "E_CONN_TO" }
 
-        return { ok: false, msg: "an error occured: " + e.message }
+        return { ok: false, code: "E_THROWABLE", info: e }
     }
 }
 
 
-const getChats = async (token: string, since: Date, users: string[]): Promise<
-    { ok: false, msg: string } | { ok: true, messages: Message[] }
-> => {
-    if ((cache.get("ratelimit_chats") as number || 0) > Date.now() - 2500) return { ok: false, msg: "RATELIMIT" }
+const getChats = async (token: string, since: Date, users: string[]):
+    Promise<
+        { ok: false, code: string, info?: object } |
+        { ok: true, messages: Message[] }
+    > => {
+    if ((cache.get("ratelimit_chats") as number || 0) > Date.now() - 2500) return { ok: false, code: "E_RATELIMIT" }
 
     cache.set("ratelimit_chats", Date.now())
     try {
@@ -99,9 +109,9 @@ const getChats = async (token: string, since: Date, users: string[]): Promise<
                 usernames: users,
                 after: Math.floor(since.valueOf() / 1000)
             })
-        if(res.status === 401) return {ok:false,msg:"chat_token expired or invalid"}
+        if (res.status === 401) return { ok: false, code: "E_INV_TOKENs" }
         if (res.status !== 200) {
-            return { ok: false, msg: "Unexpected status code return" }
+            return { ok: false, code: "E_UNH_RESCODE", info: { rescoe: res.status, resdata: res.data } }
         }
 
         const ret = res.data as chatAPIReturn
@@ -127,18 +137,18 @@ const getChats = async (token: string, since: Date, users: string[]): Promise<
             return { ok: true, messages }
 
         } else if (ret.ok === false) {
-            return { ok: false, msg: res.data.toJSON() }
+            return { ok: false, code:"E_UNH_RES", info: res.data }
         };
 
         console.log(JSON.stringify(res.data));
-        return { ok: false, msg: "unexpected return." }
+        return { ok: false, code: "E_UNX_RES", info:res.data }
 
 
-    } catch (e) {
+    } catch (e: any) {
 
-        if (e.code === "ECONNABORTED") return { ok: false, msg: "request to hackmud server timed out. Is hackmud down?" }
+        if (e.code === "ECONNABORTED") return { ok: false, code: "E_CONN_TO" }
 
-        return { ok: false, msg: "an error occured: " + e.message }
+        return { ok: false, code: "E_THROWABLE", info: e }
     }
 
 }

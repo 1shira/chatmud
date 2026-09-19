@@ -1,39 +1,39 @@
-CREATE TABLE users (
-    username TEXT PRIMARY KEY,
-);
+    CREATE TABLE users (
+        username TEXT PRIMARY KEY
+    );
 CREATE TABLE accounts (
-    aid SERIAL PRIMARY KEY,
+    aId SERIAL PRIMARY KEY,
     account_name TEXT,
     chat_token TEXT,
     chat_token_expires TIMESTAMP
 );
 
 CREATE TABLE accounts_have_users (
-    aid INTEGER REFERENCES accounts.aid,
-    uname TEXT REFERENCES users.username,
+    aId INTEGER REFERENCES accounts(aid),
+    uname TEXT REFERENCES users(username),
     PRIMARY KEY(aid, uname)
 );
 
 CREATE TABLE channels (
-    channel TEXT PRIMARY KEY,
+    channel TEXT PRIMARY KEY
 );
 
-CREATE TABLE accounts_in_channels  (
-    aid INTEGER REFERENCES accounts.aid,
-    channel TEXT REFERENCES channels.channel
-    PRIMARY KEY(aid, channel)
+CREATE TABLE users_in_channels (
+    userId TEXT REFERENCES users(username),
+    channel TEXT REFERENCES channels(channel),
+    CONSTRAINT uic_pk PRIMARY KEY (userid,channel)
 );
 
 CREATE TABLE messages (
-    mid TEXT PRIMARY KEY,
+    mId TEXT PRIMARY KEY,
     t TIMESTAMP NOT NULL,
-    from_user TEXT REFERENCES users.username NOT NULL,
+    from_user TEXT REFERENCES users(username) NOT NULL,
     msg TEXT NOT NULL,
     is_join BOOLEAN DEFAULT false,
     is_leave BOOLEAN DEFAULT false,
-    channel TEXT REFERENCES channels.channel,
-    to_user TEXT REFERENCES users.username
-    CONSTRAINT has_dest CHECK (
+    channel TEXT REFERENCES channels(channel),
+    to_user TEXT REFERENCES users(username),
+    CONSTRAINT has_one_dest CHECK (
         (channel IS NOT NULL AND to_user IS NULL) OR
         (channel IS NULL AND to_user IS NOT NULL)
     )

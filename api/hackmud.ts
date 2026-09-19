@@ -63,7 +63,7 @@ const getChatToken = async (chat_pass: chatPass):
         return { ok: false, code: "E_UNH_RESCODE", info: { rescode: res.status, resdata: res.data } }
     }
 
-    if ("ok" in res.data) return res.data;
+    if (res.data.ok === true) return res.data;
 
     console.log(JSON.stringify(res.data));
     return { ok: false, code: "E_UNX_RES", info: res.data }
